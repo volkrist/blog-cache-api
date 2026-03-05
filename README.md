@@ -77,6 +77,12 @@ docker-compose up --build
 docker-compose up -d --build
 ```
 
+Проверить статус контейнеров:
+
+```bash
+docker compose ps
+```
+
 Запустить тесты:
 
 ```bash
@@ -164,6 +170,8 @@ cp .env.example .env
 ```bash
 pytest -q
 ```
+
+Тесты используют httpx ASGITransport (совместимо с актуальными версиями httpx).
 
 ## Пример запроса
 
