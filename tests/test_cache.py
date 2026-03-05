@@ -1,53 +1,60 @@
 import pytest
 from httpx import AsyncClient
-from fastapi.testclient import TestClient
-
 from app.main import app
+import app.repositories.post_repository as repo_module
 
 
 @pytest.mark.asyncio
 async def test_health():
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+        r = await client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
 
 
-def test_caching_cache_miss_hit_then_invalidation(monkeypatch):
-    """
-    Integration test: proves cache-aside + invalidation.
-    1) First GET -> cache miss, read from PostgreSQL, store in Redis.
-    2) We patch DB (get_post raises). Second GET -> 200 from Redis (no DB).
-    3) DELETE invalidates cache. Third GET -> hits DB -> patch raises -> 500.
-    """
-    import app.repositories.post_repository as repo_module
+@pytest.mark.asyncio
+async def test_cache_aside_and_invalidation(monkeypatch):
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # 1) Create
+        r = await client.post("/posts/", json={"title": "t1", "content": "c1"})
+        assert r.status_code == 201
+        created = r.json()
+        post_id = created["id"]
 
-    client = TestClient(app)
+        # 2) First GET -> cache miss, DB -> Redis SET
+        r1 = await client.get(f"/posts/{post_id}")
+        assert r1.status_code == 200
+        assert r1.json()["id"] == post_id
 
-    # Create post
-    create_resp = client.post("/posts/", json={"title": "Cached Post", "content": "Body"})
-    assert create_resp.status_code == 201
-    post_id = create_resp.json()["id"]
+        # Подменяем репозиторий только для проверки cache-hit
+        def _boom(*args, **kwargs):
+            raise RuntimeError("DB should not be called on cache hit")
 
-    # 1) Cache miss: first GET reads from DB and fills Redis
-    get1 = client.get(f"/posts/{post_id}")
-    assert get1.status_code == 200
-    assert get1.json()["title"] == "Cached Post"
+        original_get_post = repo_module.get_post
+        monkeypatch.setattr(repo_module, "get_post", _boom)
 
-    # 2) Break DB: patch get_post to raise. Next GET must come from cache (no DB call).
-    def db_raiser(*args, **kwargs):
-        raise RuntimeError("DB should not be called when cache hits")
+        # 3) Second GET -> must be from Redis (БД не вызывается)
+        r2 = await client.get(f"/posts/{post_id}")
+        assert r2.status_code == 200
+        assert r2.json()["title"] == "t1"
 
-    monkeypatch.setattr(repo_module, "get_post", db_raiser)
+        # Возвращаем оригинальную функцию
+        monkeypatch.setattr(repo_module, "get_post", original_get_post)
 
-    get2 = client.get(f"/posts/{post_id}")
-    assert get2.status_code == 200  # From Redis — DB was not called
-    assert get2.json()["title"] == "Cached Post"
+        # 4) PUT -> invalidation (DEL key)
+        r3 = await client.put(f"/posts/{post_id}", json={"title": "t2"})
+        assert r3.status_code == 200
+        assert r3.json()["title"] == "t2"
 
-    # 3) Invalidate cache (DELETE). Keep patch: after GET, handler goes to DB -> get_post raises -> 500.
-    del_resp = client.delete(f"/posts/{post_id}")
-    assert del_resp.status_code == 204
+        # 5) После инвалидации GET идёт в БД и возвращает обновлённый пост
+        r4 = await client.get(f"/posts/{post_id}")
+        assert r4.status_code == 200
+        assert r4.json()["title"] == "t2"
 
-    get3 = client.get(f"/posts/{post_id}")
-    # Cache was invalidated; handler goes to DB; get_post raises -> 500
-    assert get3.status_code == 500
+        # 6) DELETE
+        r5 = await client.delete(f"/posts/{post_id}")
+        assert r5.status_code == 204
+
+        # 7) После удаления GET -> 404
+        r6 = await client.get(f"/posts/{post_id}")
+        assert r6.status_code == 404

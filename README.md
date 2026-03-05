@@ -11,6 +11,13 @@ docker-compose up --build
 - API: http://localhost:8000  
 - Документация: http://localhost:8000/docs  
 
+## Проверка
+
+```bash
+docker-compose up -d --build
+docker-compose exec api pytest -q
+```  
+
 ## Переменные окружения (.env)
 
 Скопируйте `.env.example` в `.env` и при необходимости измените значения:

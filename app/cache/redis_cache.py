@@ -22,9 +22,9 @@ def cache_get(key: str):
     return None
 
 
-def cache_set(key: str, value: dict, ttl: int = CACHE_TTL):
+def cache_set(key: str, value: dict, ttl: int | None = None):
     r = get_redis()
-    r.setex(key, ttl, json.dumps(value, default=str))
+    r.setex(key, ttl or CACHE_TTL, json.dumps(value, default=str))
 
 
 def cache_delete(key: str):

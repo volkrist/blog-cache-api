@@ -12,7 +12,7 @@ def list_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return post_service.get_posts(db, skip=skip, limit=limit)
 
 
-@router.get("/{post_id}", response_model=dict)
+@router.get("/{post_id}", response_model=PostResponse)
 def read_post(post_id: int, db: Session = Depends(get_db)):
     result = post_service.get_post_cached(db, post_id)
     if result is None:
@@ -26,16 +26,8 @@ def create_post(post: PostCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{post_id}", response_model=PostResponse)
-def update_post_full(post_id: int, post: PostCreate, db: Session = Depends(get_db)):
-    result = post_service.update_post(db, post_id, PostUpdate(title=post.title, content=post.content))
-    if result is None:
-        raise HTTPException(status_code=404, detail="Post not found")
-    return result
-
-
-@router.patch("/{post_id}", response_model=PostResponse)
-def update_post_partial(post_id: int, post: PostUpdate, db: Session = Depends(get_db)):
-    result = post_service.update_post(db, post_id, post)
+def update_post(post_id: int, patch: PostUpdate, db: Session = Depends(get_db)):
+    result = post_service.update_post(db, post_id, patch)
     if result is None:
         raise HTTPException(status_code=404, detail="Post not found")
     return result
@@ -43,6 +35,6 @@ def update_post_partial(post_id: int, post: PostUpdate, db: Session = Depends(ge
 
 @router.delete("/{post_id}", status_code=204)
 def delete_post(post_id: int, db: Session = Depends(get_db)):
-    if not post_service.delete_post(db, post_id):
+    ok = post_service.delete_post(db, post_id)
+    if not ok:
         raise HTTPException(status_code=404, detail="Post not found")
-    return None

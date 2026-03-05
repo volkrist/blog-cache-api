@@ -1,19 +1,18 @@
 from sqlalchemy.orm import Session
 from app.repositories import post_repository
 from app.cache.redis_cache import cache_get, cache_set, cache_delete, cache_key
-from app.cache.redis_cache import CACHE_TTL
 from app.schemas.post_schema import PostCreate, PostUpdate, PostResponse
 
 
 def get_post_cached(db: Session, post_id: int):
     key = cache_key(post_id)
     cached = cache_get(key)
-    if cached:
+    if cached is not None:
         return cached
     post = post_repository.get_post(db, post_id)
     if post:
         data = PostResponse.model_validate(post).model_dump()
-        cache_set(key, data, CACHE_TTL)
+        cache_set(key, data)
         return data
     return None
 
