@@ -83,6 +83,17 @@ docker-compose up -d --build
 docker-compose exec api pytest -q
 ```
 
+## Screenshots
+
+### Swagger (API docs)
+![Swagger](screenshots/swagger.png)
+
+### Create post (201)
+![Create](screenshots/create_post.png)
+
+### Tests
+![Tests](screenshots/tests.png)
+
 ## Переменные окружения
 
 Создайте `.env` на основе примера:

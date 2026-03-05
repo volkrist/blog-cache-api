@@ -1,12 +1,13 @@
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from app.main import app
 import app.repositories.post_repository as repo_module
 
 
 @pytest.mark.asyncio
 async def test_health():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
@@ -14,7 +15,8 @@ async def test_health():
 
 @pytest.mark.asyncio
 async def test_cache_aside_and_invalidation(monkeypatch):
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1) Create
         r = await client.post("/posts/", json={"title": "t1", "content": "c1"})
         assert r.status_code == 201
