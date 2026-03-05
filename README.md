@@ -1,5 +1,16 @@
 # Blog Cache API
 
+FastAPI service with Redis cache (cache-aside strategy) and PostgreSQL storage.
+
+**Features:**
+- REST API for blog posts
+- Redis caching with TTL
+- Cache invalidation on update/delete
+- Dockerized environment (API + PostgreSQL + Redis)
+- Automated tests (pytest)
+
+---
+
 Простой backend-сервис блога на FastAPI с хранением данных в PostgreSQL и кешированием популярных запросов в Redis.
 
 Проект демонстрирует реализацию:
